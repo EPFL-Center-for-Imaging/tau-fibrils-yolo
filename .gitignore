@@ -163,4 +163,5 @@ data/
 old/
 runs/
 pretrained_models/*.pt
+trained_models/*.pt
 notebooks/

@@ -1,12 +1,13 @@
-import sys
 from ultralytics import YOLO
 import napari
 import numpy as np
-from skimage.io import imread
+from magicgui import magicgui
+from napari.types import ImageData, LayerDataTuple
 from skimage.exposure import rescale_intensity
 
 
-MODEL_WEIGHTS_FILE = '/home/wittwer/code/tau-fibrils-yolo/runs/obb/train3/weights/best.pt'
+MODEL_WEIGHTS_FILE = '/home/wittwer/code/tau-fibrils-yolo/trained_models/100ep.pt'
+# MODEL_WEIGHTS_FILE = '/home/wittwer/code/tau-fibrils-yolo/trained_models/1000ep.pt'
 IMGSZ = 640
 MODEL = YOLO(
     model=MODEL_WEIGHTS_FILE,
@@ -50,12 +51,9 @@ def handle_predict(image, model, imgsz):
     elif len(image.shape) == 3:
         image = image[..., 0]
 
-    print(f"Max: ", image.max())
-
     # Compute the pre-existing zero-padding at the top-left (if any)
     nx00 = (np.sum(image, axis=0) != 0).argmax()
     ny00 = (np.sum(image, axis=1) != 0).argmax()
-    # image = image[ny0:, nx0:].copy()
 
     # Pad the image
     image_p = handle_padding(image, imgsz)
@@ -69,10 +67,10 @@ def handle_predict(image, model, imgsz):
 
     results = model.predict(
         source=image_inputs, 
-        conf=0.25,  # Confidence threshold for detections.
+        conf=0.01,  # Confidence threshold for detections.
         iou=0.5,  # Intersection over union threshold.
         imgsz=imgsz,  # Square resizing
-        max_det=300,
+        max_det=500,  # Max detections per 640 x 640 crop
         augment=False,
     )
 
@@ -82,37 +80,38 @@ def handle_predict(image, model, imgsz):
     ny0 = (np.sum(first_crop, axis=1) != 0).argmax()
 
     all_coordinates = []
+    all_probabilities = []
     for result, (nxp, nyp) in zip(results, image_inputs_offset_coords_px):
         boxes_coordinates = result.obb.xyxyxyxy.cpu().numpy()
-        # probabilities = result.obb.conf.cpu().numpy()
-        boxes_coordinates[..., 0] = boxes_coordinates[..., 0] + nyp - ny0
-        boxes_coordinates[..., 1] = boxes_coordinates[..., 1] + nxp - nx0
+        boxes_coordinates[..., 0] = boxes_coordinates[..., 0] + nyp
+        boxes_coordinates[..., 1] = boxes_coordinates[..., 1] + nxp
         all_coordinates.append(boxes_coordinates)
+
+        probabilities = result.obb.conf.cpu().numpy()
+        all_probabilities.extend(probabilities)
+
     all_coordinates = np.vstack(all_coordinates)
-    print(all_coordinates.shape)
+    all_probabilities = np.asarray(all_probabilities)
 
-    all_coordinates[..., 0] = all_coordinates[..., 0] + ny00
-    all_coordinates[..., 1] = all_coordinates[..., 1] + nx00
+    all_coordinates[..., 0] = all_coordinates[..., 0] + ny00 - nx0
+    all_coordinates[..., 1] = all_coordinates[..., 1] + nx00 - ny0
 
-    return all_coordinates
+    return all_coordinates, all_probabilities
 
-
-from magicgui import magicgui
-from napari.types import ImageData, LayerDataTuple
 
 @magicgui(auto_call=False)
 def widget_yolo(image: ImageData) -> LayerDataTuple:
 
-    print(image.shape)
-
-    boxes_coordinates = handle_predict(image, MODEL, imgsz=IMGSZ)
+    boxes_coordinates, probabilities = handle_predict(image, MODEL, imgsz=IMGSZ)
 
     shape_kwargs = {
         "shape_type": 'rectangle',
-        "edge_color": '#ff0000',
-        "face_color": '#ff000044',
+        "edge_color": 'probability',
+        "face_color": 'transparent',
         "edge_width": 2, 
-        "name":"Tau fibrils (Yolo)"
+        "name":"Tau fibrils (Yolo)",
+        "opacity": 1.0,
+        "properties": {'probability': probabilities}
     }
 
     shapes_data = boxes_coordinates[:, :, ::-1]
