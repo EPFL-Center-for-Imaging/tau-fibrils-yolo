@@ -1,0 +1,1 @@
+from tau_fibrils_yolo._widget import YoloDetectorWidget

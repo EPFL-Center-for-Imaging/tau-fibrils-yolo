@@ -1,5 +1,0 @@
-ultralytics
-opencv-contrib-python-headless
-ipykernel
-scikit-image
-matplotlib

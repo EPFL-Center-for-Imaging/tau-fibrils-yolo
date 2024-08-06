@@ -165,3 +165,5 @@ runs/
 pretrained_models/*.pt
 trained_models/*.pt
 notebooks/
+
+_version.py

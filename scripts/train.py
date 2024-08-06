@@ -1,5 +1,4 @@
 import sys
-# from pathlib import Path
 from ultralytics import YOLO
 
 PRETRAINED_MODEL_FILE = '/home/wittwer/code/tau-fibrils-yolo/pretrained_models/yolov8n-obb.pt'

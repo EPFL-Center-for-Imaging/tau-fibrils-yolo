@@ -1,18 +1,24 @@
-from ultralytics import YOLO
-import napari
+import os
 import numpy as np
-from magicgui import magicgui
-from napari.types import ImageData, LayerDataTuple
 from skimage.exposure import rescale_intensity
+from ultralytics import YOLO
+import pooch
 
-
-MODEL_WEIGHTS_FILE = '/home/wittwer/code/tau-fibrils-yolo/trained_models/100ep.pt'
-# MODEL_WEIGHTS_FILE = '/home/wittwer/code/tau-fibrils-yolo/trained_models/1000ep.pt'
-IMGSZ = 640
-MODEL = YOLO(
-    model=MODEL_WEIGHTS_FILE,
-    task='obb',
+MODEL_PATH = os.path.expanduser(
+    os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".yolo")
 )
+
+
+def retreive_model():
+    """Downloads the model weights from Zenodo."""
+    print(" /!\ This model is on the Zenodo Sandbox (use it only for testing purposes) /!\ ")
+    pooch.retrieve(
+        url="https://sandbox.zenodo.org/records/99113/files/100ep.pt",
+        known_hash="md5:2fc4be1e4feae93f75e335856be3083d",
+        path=MODEL_PATH,
+        progressbar=True,
+        fname="yolo_fibrils_100ep.pt",
+    )
 
 
 def handle_padding(image, imgsz):
@@ -99,26 +105,12 @@ def handle_predict(image, model, imgsz):
     return all_coordinates, all_probabilities
 
 
-@magicgui(auto_call=False)
-def widget_yolo(image: ImageData) -> LayerDataTuple:
+class FibrilsDetector():
+    def __init__(self):
+        retreive_model()
+        self.model = YOLO(os.path.join(MODEL_PATH, "yolo_fibrils_100ep.pt"))
+        self.imgsz = 640
 
-    boxes_coordinates, probabilities = handle_predict(image, MODEL, imgsz=IMGSZ)
-
-    shape_kwargs = {
-        "shape_type": 'rectangle',
-        "edge_color": 'probability',
-        "face_color": 'transparent',
-        "edge_width": 2, 
-        "name":"Tau fibrils (Yolo)",
-        "opacity": 1.0,
-        "properties": {'probability': probabilities}
-    }
-
-    shapes_data = boxes_coordinates[:, :, ::-1]
-
-    return (shapes_data, shape_kwargs, 'shapes')
-
-if __name__=='__main__':
-    viewer = napari.Viewer()
-    viewer.window.add_dock_widget(widget_yolo)
-    napari.run()
+    def predict(self, image: np.ndarray) -> np.ndarray:
+        boxes, probas = handle_predict(image, self.model, self.imgsz)
+        return boxes, probas
