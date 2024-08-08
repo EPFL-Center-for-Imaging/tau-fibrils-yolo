@@ -15,6 +15,7 @@ from qtpy.QtWidgets import (
     QDoubleSpinBox,
 )
 from tau_fibrils_yolo.predict import FibrilsDetector
+from tau_fibrils_yolo.measure import distance_measurement
 
 
 class YoloDetectorWidget(QWidget):
@@ -26,6 +27,8 @@ class YoloDetectorWidget(QWidget):
 
         self.shapes_layer = None
         self.filtered_shapes_layer = None
+        self.crossover_shapes_layer = None
+        self.filtered_lines_layer = None
 
         # Layout
         grid_layout = QGridLayout()
@@ -56,6 +59,9 @@ class YoloDetectorWidget(QWidget):
         self.pbar = QProgressBar(self, minimum=0, maximum=1)
         self.pbar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         grid_layout.addWidget(self.pbar, 3, 0, 1, 2)
+
+        self.cd_label = QLabel("CD: -", self)
+        grid_layout.addWidget(self.cd_label, 4, 0, 1, 2)
 
         # Setup layer callbacks
         self.viewer.layers.events.inserted.connect(
@@ -94,17 +100,48 @@ class YoloDetectorWidget(QWidget):
         if len(boxes) == 0:
             show_info("No fibrils were detected.")
             return
-
+        
         boxes = boxes[:, :, ::-1]  # Correct X-Y coordinates for Napari.
+
+        # Get the lines and crossover distances
+        image = self.cb_image.currentData()
+        distances = []
+        line_data = []
+        for box in boxes:
+            distance, line_points = distance_measurement(box, image)
+            distances.append(distance)
+            line_data.append(line_points)
+
+        
+        lines_props = {
+            "shape_type": 'line',
+            "name": "Crossover distance",
+            "opacity": 1.0, 
+            "edge_width": 1,
+            "edge_color": 'probability',
+            "properties": {
+                'probability': probas, 
+                'distance': distances
+            },
+        }
+        self.crossover_shapes_layer = self.viewer.add_shapes(line_data, **lines_props)
 
         shape_kwargs = {
             "shape_type": 'rectangle',
-            "edge_color": 'probability',
-            "face_color": 'transparent',
-            "edge_width": 2, 
             "name":"Tau fibrils (Yolo)",
+            "face_color": 'transparent',
             "opacity": 1.0,
-            "properties": {'probability': probas}
+            "edge_width": 1, 
+            "edge_color": 'probability',
+            "properties": {
+                'probability': probas, 
+                'distance': distances
+            },
+            # "text": {
+            #     'string': '{distance:0.0f}', 
+            #     'color': 'red', 
+            #     'anchor': 'center'
+            # }
         }
 
         self.shapes_layer = self.viewer.add_shapes(
@@ -121,24 +158,69 @@ class YoloDetectorWidget(QWidget):
             return
         
         shapes_data = np.array(self.shapes_layer.data)
+        lines_data = np.array(self.crossover_shapes_layer.data)
 
         probabilities = self.shapes_layer.features['probability']
+        distances = self.shapes_layer.features['distance']
 
         filtered_shapes = shapes_data[probabilities >= probability_thresh]
+        filtered_lines = lines_data[probabilities >= probability_thresh]
+        filtered_distances = distances[probabilities >= probability_thresh]
+        # filtered_probabilities = probabilities[probabilities >= probability_thresh]
+
+        if self.filtered_lines_layer is None:
+            lines_props = {
+                "shape_type": 'line',
+                "name": "Crossover distance (filtered)",
+                "opacity": 1.0, 
+                "edge_width": 1,
+                "edge_color": '#ff0000',
+                # "properties": {
+                #     'probability': filtered_probabilities, 
+                #     'distance': filtered_distances
+                # },
+            }
+            self.filtered_lines_layer = self.viewer.add_shapes(filtered_lines, **lines_props)
 
         if self.filtered_shapes_layer is None:
             shapes_props = {
                 "shape_type": 'rectangle',
                 "name": "Tau fibrils (filtered)",
-                "opacity": 1.0, 
                 "face_color": 'transparent',
-                "edge_width": 2,
+                "opacity": 1.0, 
+                "edge_width": 1,
                 "edge_color": '#ff0000',
+                # "properties": {
+                #     'probability': filtered_probabilities, 
+                #     'distance': filtered_distances
+                # },
+                # "text": {
+                #     'string': '{distance:0.0f}', 
+                #     'color': 'red', 
+                #     'anchor': 'center'
+                # }
             }
             self.filtered_shapes_layer = self.viewer.add_shapes(filtered_shapes, **shapes_props)
+
         else:
             self.filtered_shapes_layer.data = filtered_shapes
-            self.filtered_shapes_layer.edge_width = 2
+            self.filtered_shapes_layer.edge_width = 1
+            # self.filtered_shapes_layer.properties = {
+            #     'probability': filtered_probabilities, 
+            #     'distance': filtered_distances
+            # }
             self.filtered_shapes_layer.refresh()
 
-        self.shapes_layer.visible = False
+            self.filtered_lines_layer.data = filtered_lines
+            self.filtered_lines_layer.edge_width = 1
+            # self.filtered_lines_layer.properties = {
+            #     'probability': filtered_probabilities, 
+            #     'distance': filtered_distances
+            # }
+            self.filtered_lines_layer.refresh()
+
+        # self.shapes_layer.visible = False
+        # self.crossover_shapes_layer.visible = False
+
+        self.cd_label.setText(f"CD: {np.mean(filtered_distances):.1f} ± {np.std(filtered_distances):.1f} px")
+        # print(f"Mean crossover distance: ", np.mean(filtered_distances))

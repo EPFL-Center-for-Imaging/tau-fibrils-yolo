@@ -111,6 +111,6 @@ class FibrilsDetector():
         self.model = YOLO(os.path.join(MODEL_PATH, "yolo_fibrils_100ep.pt"))
         self.imgsz = 640
 
-    def predict(self, image: np.ndarray) -> np.ndarray:
+    def predict(self, image: np.ndarray):
         boxes, probas = handle_predict(image, self.model, self.imgsz)
         return boxes, probas
