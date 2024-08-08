@@ -20,10 +20,8 @@ TODO.
 
 ## Next steps
 
-- Selectable confidence threshold
-- Model on Zenodo (instead of sandbox)
+- Selectable confidence threshold => Performance?
+- Model on Zenodo (instead of sandbox) with sample data (e.g. R2?)
 - Write a README
 - Release with PyApp
-- Measure crossover distance
-- Export results
-- Sample data contribution
+- Measure crossover distance & export results

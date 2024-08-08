@@ -12,31 +12,9 @@ from qtpy.QtWidgets import (
     QPushButton,
     QWidget,
     QSizePolicy,
+    QDoubleSpinBox,
 )
-from magicgui import magicgui
 from tau_fibrils_yolo.predict import FibrilsDetector
-
-
-@magicgui(auto_call=True)
-def shapes_probability_threshold(shapes: napari.layers.Shapes, probability_thresh: float=0.5) -> napari.types.LayerDataTuple:
-    shapes_data = np.array(shapes.data)
-    probabilities = shapes.features['probability']
-
-    filtered_shapes = shapes_data[probabilities >= probability_thresh]
-
-    shapes_props = {
-        "shape_type": 'rectangle',
-        "name": "Filtered fibrils",
-        "opacity": 1.0, 
-        "face_color": 'transparent',
-        "edge_width": 2,
-        "edge_color": 'probability',
-        "properties": {'probability': probabilities[probabilities >= probability_thresh]}
-    }
-
-    shapes.visible = False
-
-    return (filtered_shapes, shapes_props, 'shapes')
 
 
 class YoloDetectorWidget(QWidget):
@@ -45,6 +23,9 @@ class YoloDetectorWidget(QWidget):
 
         self.viewer = napari_viewer
         self.predictor = FibrilsDetector()
+
+        self.shapes_layer = None
+        self.filtered_shapes_layer = None
 
         # Layout
         grid_layout = QGridLayout()
@@ -60,12 +41,21 @@ class YoloDetectorWidget(QWidget):
         # Compute button
         self.btn = QPushButton("Detect fibrils", self)
         self.btn.clicked.connect(self._start_detection)
-        grid_layout.addWidget(self.btn, 3, 0, 1, 2)
+        grid_layout.addWidget(self.btn, 1, 0, 1, 2)
+
+        self.bx_probas = QDoubleSpinBox()
+        self.bx_probas.setMinimum(0.0)
+        self.bx_probas.setMaximum(1.0)
+        self.bx_probas.setSingleStep(0.01)
+        self.bx_probas.setValue(0.5)
+        self.bx_probas.valueChanged.connect(self._filter_detections)
+        grid_layout.addWidget(QLabel("Probability", self), 2, 0)
+        grid_layout.addWidget(self.bx_probas, 2, 1)
 
         # Progress bar
         self.pbar = QProgressBar(self, minimum=0, maximum=1)
         self.pbar.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        grid_layout.addWidget(self.pbar, 4, 0, 1, 2)
+        grid_layout.addWidget(self.pbar, 3, 0, 1, 2)
 
         # Setup layer callbacks
         self.viewer.layers.events.inserted.connect(
@@ -81,7 +71,7 @@ class YoloDetectorWidget(QWidget):
             if isinstance(x, napari.layers.Image):
                 if x.data.ndim in [2, 3]:
                     self.cb_image.addItem(x.name, x.data)
-
+        
     @thread_worker
     def _prediction_thread(self):
         return self.predictor.predict(self.selected_image)
@@ -117,9 +107,38 @@ class YoloDetectorWidget(QWidget):
             "properties": {'probability': probas}
         }
 
-        self.viewer.add_shapes(
+        self.shapes_layer = self.viewer.add_shapes(
             boxes,
             **shape_kwargs
         )
         
         self.pbar.setMaximum(1)
+
+        self._filter_detections(self.bx_probas.value())
+
+    def _filter_detections(self, probability_thresh):
+        if self.shapes_layer is None:
+            return
+        
+        shapes_data = np.array(self.shapes_layer.data)
+
+        probabilities = self.shapes_layer.features['probability']
+
+        filtered_shapes = shapes_data[probabilities >= probability_thresh]
+
+        if self.filtered_shapes_layer is None:
+            shapes_props = {
+                "shape_type": 'rectangle',
+                "name": "Tau fibrils (filtered)",
+                "opacity": 1.0, 
+                "face_color": 'transparent',
+                "edge_width": 2,
+                "edge_color": '#ff0000',
+            }
+            self.filtered_shapes_layer = self.viewer.add_shapes(filtered_shapes, **shapes_props)
+        else:
+            self.filtered_shapes_layer.data = filtered_shapes
+            self.filtered_shapes_layer.edge_width = 2
+            self.filtered_shapes_layer.refresh()
+
+        self.shapes_layer.visible = False
