@@ -36,6 +36,7 @@ def distance_measurement(box, image):
     # Calculate the distance
     distance = (1 / main_freq) * (line_length / len(pixel_values))
 
+    # Line for visualization
     diagonal = (p6 - p5)
     center = p5 + diagonal / 2
     diagonal_norm = diagonal / norm(diagonal)
@@ -46,7 +47,7 @@ def distance_measurement(box, image):
         ]
     )
 
-    return distance, line_points
+    return distance, line_points, center, line_length, line_width
 
 if __name__=='__main__':
     from tau_fibrils_yolo import FibrilsDetector

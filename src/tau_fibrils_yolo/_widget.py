@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 import napari
 import napari.layers
 from napari.utils.notifications import show_info
@@ -13,6 +14,7 @@ from qtpy.QtWidgets import (
     QWidget,
     QSizePolicy,
     QDoubleSpinBox,
+    QFileDialog
 )
 from tau_fibrils_yolo.predict import FibrilsDetector
 from tau_fibrils_yolo.measure import distance_measurement
@@ -29,6 +31,7 @@ class YoloDetectorWidget(QWidget):
         self.filtered_shapes_layer = None
         self.crossover_shapes_layer = None
         self.filtered_lines_layer = None
+        self.df = None
 
         # Layout
         grid_layout = QGridLayout()
@@ -62,6 +65,10 @@ class YoloDetectorWidget(QWidget):
 
         self.cd_label = QLabel("CD: -", self)
         grid_layout.addWidget(self.cd_label, 4, 0, 1, 2)
+
+        export_btn = QPushButton("Export results (.csv)", self)
+        export_btn.clicked.connect(self._save_csv)
+        grid_layout.addWidget(export_btn, 5, 0, 1, 2)
 
         # Setup layer callbacks
         self.viewer.layers.events.inserted.connect(
@@ -107,11 +114,27 @@ class YoloDetectorWidget(QWidget):
         image = self.cb_image.currentData()
         distances = []
         line_data = []
+        centers_x = []
+        centers_y = []
+        lengths = []
+        widths = []
         for box in boxes:
-            distance, line_points = distance_measurement(box, image)
+            distance, line_points, center, length, width = distance_measurement(box, image)
             distances.append(distance)
             line_data.append(line_points)
+            centers_x.append(center[0])
+            centers_y.append(center[1])
+            lengths.append(length)
+            widths.append(width)
 
+        self.df = pd.DataFrame({
+            'detection_probability': probas, 
+            'crossover_distance': distances,
+            'length': lengths,
+            'width': widths,
+            'center_x': centers_x,
+            'center_y': centers_y
+        })
         
         lines_props = {
             "shape_type": 'line',
@@ -135,7 +158,11 @@ class YoloDetectorWidget(QWidget):
             "edge_color": 'probability',
             "properties": {
                 'probability': probas, 
-                'distance': distances
+                'distance': distances,
+                'length': lengths,
+                'width': widths,
+                'center_x': centers_x,
+                'center_y': centers_y
             },
             # "text": {
             #     'string': '{distance:0.0f}', 
@@ -224,3 +251,18 @@ class YoloDetectorWidget(QWidget):
 
         self.cd_label.setText(f"CD: {np.mean(filtered_distances):.1f} ± {np.std(filtered_distances):.1f} px")
         # print(f"Mean crossover distance: ", np.mean(filtered_distances))
+
+    def _save_csv(self):
+        if self.df is None:
+            print("No detection data found.")
+            return
+        
+        print("Saving CSV.")
+        filename, _ = QFileDialog.getSaveFileName(
+            self, "Save as CSV", ".", "*.csv"
+        )
+        if not filename.endswith(".csv"):
+            filename += ".csv"
+
+        self.df.to_csv(filename)
+        print(f"Saved {filename}!")
