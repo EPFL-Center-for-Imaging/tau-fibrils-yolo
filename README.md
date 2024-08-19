@@ -39,7 +39,7 @@ pip install -e .
 
 ## Model
 
-The model weights (~6 Mb) are automatically downloaded from [this repository on Zenodo](https://sandbox.zenodo.org/records/99113/) the first time you run inference. The model files are saved in the user home folder in the `.yolo` directory.
+The model weights (6.5 Mb) are automatically downloaded from [this repository on Zenodo](https://sandbox.zenodo.org/records/99113) the first time you run inference. The model files are saved in the user home folder in the `.yolo` directory.
 
 ## Usage
 
@@ -111,3 +111,7 @@ If you encounter any problems, please file an issue along with a detailed descri
 ## License
 
 This model is licensed under the [BSD-3](LICENSE) license.
+
+## Acknowledgements
+
+We would particularly like to thank **Valentin Vuillon** for annotating the images on which this model was trained, and for developing the preliminary code that laid the foundation for this image analysis project. The repository containing his original version of the project can be found [here](https://gitlab.com/epfl-center-for-imaging/automated-analysis-tau-fibrils-project).
