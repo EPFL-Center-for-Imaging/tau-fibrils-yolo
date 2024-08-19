@@ -64,12 +64,6 @@ jobs:
           VERSION=${VERSION#v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
-      - name: Print variables
-        shell: bash
-        run: |
-          echo ${{ env.VERSION }}
-          echo ${{ env.PYAPP_PROJECT_NAME }}
-      
       - name: Build executable for Windows
         env:
           PYAPP_PROJECT_VERSION: ${{ env.VERSION }}

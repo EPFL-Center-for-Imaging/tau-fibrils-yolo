@@ -21,15 +21,21 @@ dependencies = [
     "qtpy",
     "magicgui",
     "numpy",
+    "pandas",
     "tifffile",
     "pooch==1.8.0",
     "scikit-image",
+    "scikit-learn",
     "ultralytics",
     "opencv-contrib-python-headless"
 ]
 
 [project.entry-points."napari.manifest"]
 tau_fibrils_yolo = "tau_fibrils_yolo:napari.yaml"
+
+[project.scripts]
+tau_fibrils_predict_image = "tau_fibrils_yolo.cli:cli_predict_image"
+tau_fibrils_predict_folder = "tau_fibrils_yolo.cli:cli_predict_folder"
 
 [project.urls]
 homepage = "https://github.com/EPFL-Center-for-Imaging/tau_fibrils_yolo"

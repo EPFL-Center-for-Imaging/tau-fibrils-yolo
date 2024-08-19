@@ -1,17 +1,25 @@
 import os
 import numpy as np
 from skimage.exposure import rescale_intensity
+from skimage.transform import rescale
 from ultralytics import YOLO
 import pooch
 
-MODEL_PATH = os.path.expanduser(
-    os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".yolo")
+from tau_fibrils_yolo.postprocess import (
+    outside_image_border_filter,
+    minimum_neighbor_distance_filter,
+    overlapping_obb_filter,
 )
+
+
+MODEL_PATH = os.path.expanduser(os.path.join(os.getenv("XDG_DATA_HOME", "~"), ".yolo"))
 
 
 def retreive_model():
     """Downloads the model weights from Zenodo."""
-    print(" /!\ This model is on the Zenodo Sandbox (use it only for testing purposes) /!\ ")
+    print(
+        " /!\ This model is on the Zenodo Sandbox (use it only for testing purposes) /!\ "
+    )
     pooch.retrieve(
         url="https://sandbox.zenodo.org/records/99113/files/100ep.pt",
         known_hash="md5:2fc4be1e4feae93f75e335856be3083d",
@@ -21,96 +29,140 @@ def retreive_model():
     )
 
 
-def handle_padding(image, imgsz):
+def pad_image(image, tile_size_px, overlap_px):
+    """Pads the image so that its length and width are divisible by the model's image size (which is assumed to be square)."""
     rx, ry = image.shape
-    nx = np.ceil(rx / imgsz).astype(int)
-    ny = np.ceil(ry / imgsz).astype(int)
 
-    pad_x = (nx * imgsz - rx) // 2
-    pad_y = (ny * imgsz - ry) // 2
+    pad_x = rx % (tile_size_px - overlap_px) + overlap_px
+    half_pad_x = pad_x // 2
+    nx_ceil = np.ceil((rx + pad_x - overlap_px) / (tile_size_px - overlap_px)).astype(
+        int
+    )
+    padded_image_size_x = nx_ceil * (tile_size_px - overlap_px) + overlap_px
 
-    image_p = np.zeros((nx*imgsz, ny*imgsz))
-    image_p[pad_x:(pad_x+rx), pad_y:(pad_y+ry)] = image
+    pad_y = ry % (tile_size_px - overlap_px) + overlap_px
+    half_pad_y = pad_y // 2
+    ny_ceil = np.ceil((ry + pad_y - overlap_px) / (tile_size_px - overlap_px)).astype(
+        int
+    )
+    padded_image_size_y = ny_ceil * (tile_size_px - overlap_px) + overlap_px
 
-    return image_p
+    image_padded = np.zeros((padded_image_size_x, padded_image_size_y))
+
+    image_padded[half_pad_x : (half_pad_x + rx), half_pad_y : (half_pad_y + ry)] = image
+
+    return image_padded, (half_pad_x, half_pad_y), (nx_ceil, ny_ceil)
 
 
-def crop_generator(image_p, imgsz):
-    rx, ry = image_p.shape
-    nx = rx // imgsz
-    ny = ry // imgsz
-
+def image_tile_generator(image, imgsz, overlap_px):
+    """Generates image tiles and their coordinates in the image domain."""
+    image_p, (pad_x, pad_y), (nx, ny) = pad_image(image, imgsz, overlap_px)
+    shift_x = imgsz - overlap_px
+    shift_y = imgsz - overlap_px
     for ix in range(nx):
         for iy in range(ny):
-            crop = image_p[(ix*imgsz):(ix+1)*imgsz, (iy*imgsz):(iy+1)*imgsz]
-            yield crop, (ix, iy)
+            image_tile = image_p[
+                (ix * shift_x) : (ix * shift_x + imgsz),
+                (iy * shift_y) : (iy * shift_y + imgsz),
+            ]
+            coord_x = ix * shift_x - pad_x
+            coord_y = iy * shift_y - pad_y
+
+            yield image_tile, (coord_x, coord_y)
 
 
 def to_rgb(arr):
     return np.repeat(arr[..., None], repeats=3, axis=-1)
 
 
-def handle_predict(image, model, imgsz):
-
+def preprocess_image(image, rescale_factor):
+    # Make sure the image is single-channel
     if len(image.shape) == 2:
         image = rescale_intensity(image, out_range=(0, 255)).astype(np.uint8)
     elif len(image.shape) == 3:
         image = image[..., 0]
 
-    # Compute the pre-existing zero-padding at the top-left (if any)
-    nx00 = (np.sum(image, axis=0) != 0).argmax()
-    ny00 = (np.sum(image, axis=1) != 0).argmax()
+    # Rescale the image to make it match the target resolution.
+    image = rescale(image, rescale_factor, order=3, preserve_range=True)
 
-    # Pad the image
-    image_p = handle_padding(image, imgsz)
+    return image
 
-    # Convert the images to pseudo-RGB
-    image_inputs = [to_rgb(c) for (c, (nx, ny)) in crop_generator(image_p, imgsz)]
 
-    image_inputs_offset_coords_px = [
-        (nx*imgsz, ny*imgsz) for (c, (nx, ny)) in crop_generator(image_p, imgsz)
-    ]
+def predict_generator(image, model, imgsz, rescale_factor=1.0, overlap_px=None):
+    if overlap_px is None:
+        # 10% overlap by default
+        overlap_px = imgsz // 10
 
-    results = model.predict(
-        source=image_inputs, 
-        conf=0.01,  # Confidence threshold for detections.
-        iou=0.5,  # Intersection over union threshold.
-        imgsz=imgsz,  # Square resizing
-        max_det=500,  # Max detections per 640 x 640 crop
-        augment=False,
-    )
+    image = preprocess_image(image, rescale_factor)
 
-    # First, remove the top-left delta XY (todo)
-    first_crop = image_inputs[0][..., 0]
-    nx0 = (np.sum(first_crop, axis=0) != 0).argmax()
-    ny0 = (np.sum(first_crop, axis=1) != 0).argmax()
+    for k, (image_tile, (coord_x, coord_y)) in enumerate(
+        image_tile_generator(image, imgsz, overlap_px)
+    ):
+        image_input = to_rgb(image_tile)
 
-    all_coordinates = []
-    all_probabilities = []
-    for result, (nxp, nyp) in zip(results, image_inputs_offset_coords_px):
-        boxes_coordinates = result.obb.xyxyxyxy.cpu().numpy()
-        boxes_coordinates[..., 0] = boxes_coordinates[..., 0] + nyp
-        boxes_coordinates[..., 1] = boxes_coordinates[..., 1] + nxp
-        all_coordinates.append(boxes_coordinates)
+        result = model.predict(
+            source=image_input,
+            conf=0.05,  # Confidence threshold for detections.
+            iou=0.1,  # Intersection over union threshold.
+            max_det=500,  # Max detections per 640 x 640 crop
+            augment=False,
+            imgsz=imgsz,  # Square resizing
+        )[0]
 
         probabilities = result.obb.conf.cpu().numpy()
-        all_probabilities.extend(probabilities)
+        boxes_coordinates = result.obb.xyxyxyxy.cpu().numpy()
+        boxes_coordinates[..., 1] = (
+            boxes_coordinates[..., 1] + coord_x
+        ) / rescale_factor
+        boxes_coordinates[..., 0] = (
+            boxes_coordinates[..., 0] + coord_y
+        ) / rescale_factor
 
-    all_coordinates = np.vstack(all_coordinates)
-    all_probabilities = np.asarray(all_probabilities)
+        # Invert X-Y
+        boxes_coordinates = boxes_coordinates[..., ::-1]
 
-    all_coordinates[..., 0] = all_coordinates[..., 0] + ny00 - nx0
-    all_coordinates[..., 1] = all_coordinates[..., 1] + nx00 - ny0
-
-    return all_coordinates, all_probabilities
+        yield k, boxes_coordinates, probabilities
 
 
-class FibrilsDetector():
+class FibrilsDetector:
     def __init__(self):
         retreive_model()
         self.model = YOLO(os.path.join(MODEL_PATH, "yolo_fibrils_100ep.pt"))
         self.imgsz = 640
+        self.overlap_px = self.imgsz // 10
 
-    def predict(self, image: np.ndarray):
-        boxes, probas = handle_predict(image, self.model, self.imgsz)
+    def n_crops(self, image: np.ndarray, rescale_factor: float):
+        return np.prod(
+            pad_image(
+                preprocess_image(image, rescale_factor), self.imgsz, self.overlap_px
+            )[-1]
+        )
+
+    def predict(self, image: np.ndarray, rescale_factor: float):
+        boxes = []
+        probas = []
+        for _, b, p in predict_generator(image, self.model, self.imgsz, rescale_factor):
+            boxes.extend(b)
+            probas.extend(p)
+        boxes = np.array(boxes)
+        probas = np.array(probas)
+
+        filt = outside_image_border_filter(boxes)
+        boxes = boxes[filt]
+        probas = probas[filt]
+
+        filt = overlapping_obb_filter(boxes)
+        boxes = boxes[filt]
+        probas = probas[filt]
+
+        filt = minimum_neighbor_distance_filter(boxes, rescale_factor)
+        boxes = boxes[filt]
+        probas = probas[filt]
+
         return boxes, probas
+
+    def yield_predictions(self, image: np.ndarray, rescale_factor: float):
+        for k, boxes, probas in predict_generator(
+            image, self.model, self.imgsz, rescale_factor
+        ):
+            yield k, boxes, probas
