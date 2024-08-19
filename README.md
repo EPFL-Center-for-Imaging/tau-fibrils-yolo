@@ -37,7 +37,7 @@ cd tau-fibrils-yolo
 pip install -e .
 ```
 
-## Model weights
+## Model
 
 The model weights (~6 Mb) are automatically downloaded from [this repository on Zenodo](https://sandbox.zenodo.org/records/99113/) the first time you run inference. The model files are saved in the user home folder in the `.yolo` directory.
 
@@ -103,3 +103,11 @@ folder/
     ├── image_002.tif
     ├── image_002_results.csv
 ```
+
+## Issues
+
+If you encounter any problems, please file an issue along with a detailed description.
+
+## License
+
+This model is licensed under the [BSD-3](LICENSE) license.
