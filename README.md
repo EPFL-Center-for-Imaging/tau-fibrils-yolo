@@ -13,7 +13,7 @@ This project is part of a collaboration between the [EPFL Center for Imaging](ht
 
 ### As a standalone app
 
-Soon.
+Download and run the latest installer from the [Releases](https://github.com/EPFL-Center-for-Imaging/tau-fibrils-yolo/releases) page.
 
 ### As a Python package
 
