@@ -63,20 +63,27 @@ jobs:
           VERSION=${{ github.ref_name }}
           VERSION=${VERSION#v}
           echo "VERSION=$VERSION" >> $GITHUB_ENV
+      
+      - name: Download PyApp
+        shell: bash
+        run: |
+          curl https://github.com/ofek/pyapp/releases/latest/download/source.tar.gz -Lo pyapp-source.tar.gz
+          tar -xzf pyapp-source.tar.gz
+          mv pyapp-v* pyapp-latest
 
       - name: Build executable for Windows
         env:
           PYAPP_PROJECT_VERSION: ${{ env.VERSION }}
           PYAPP_PYTHON_VERSION: '3.9'
-        run: cargo build --release --manifest-path pyapp/pyapp-latest/Cargo.toml
+        run: cargo build --release --manifest-path pyapp-latest/Cargo.toml
 
       - name: Archive Windows executable
         shell: bash
-        working-directory: pyapp/pyapp-latest/target/release
+        working-directory: pyapp-latest/target/release
         run: |
           EXECUTABLE_NAME=${{ env.PYAPP_PROJECT_NAME }}_${{ runner.os }}_${{ env.VERSION }}.exe
           mv pyapp.exe $EXECUTABLE_NAME
-          tar -czvf ../../../../executable-windows.tar.gz $EXECUTABLE_NAME
+          tar -czvf ../../../executable-windows.tar.gz $EXECUTABLE_NAME
 
       - name: Upload artifact
         uses: actions/upload-artifact@v2
