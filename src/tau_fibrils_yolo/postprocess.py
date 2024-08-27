@@ -53,11 +53,12 @@ def boxes_center_coordinates(boxes):
 def boxes_kernel_density_map(boxes, image, gaussian_sigma_px=50, downscale_factor=8):
     """Kernel density estimate from bounding box coordinates"""
 
-    image_shape = np.array(image.shape) // downscale_factor
+    grid_size_x = image.shape[0] // downscale_factor
+    grid_size_y = image.shape[1] // downscale_factor
 
     x_grid, y_grid = np.meshgrid(
-        np.linspace(0, image_shape[1] - 1, image_shape[1]),
-        np.linspace(0, image_shape[0] - 1, image_shape[0]),
+        np.linspace(0, grid_size_y - 1, grid_size_y),
+        np.linspace(0, grid_size_x - 1, grid_size_x),
     )
 
     grid_points = np.vstack([y_grid.ravel(), x_grid.ravel()]).T
@@ -70,7 +71,7 @@ def boxes_kernel_density_map(boxes, image, gaussian_sigma_px=50, downscale_facto
 
     kde.fit(boxes_center_coordinates(boxes) / downscale_factor)
 
-    density_map = np.exp(kde.score_samples(grid_points)).reshape(image_shape)
+    density_map = np.exp(kde.score_samples(grid_points)).reshape((grid_size_x, grid_size_y))
     density_map = zoom(density_map, zoom=downscale_factor, order=1)
     density_map = rescale_intensity(density_map, out_range=(0, 1))
 

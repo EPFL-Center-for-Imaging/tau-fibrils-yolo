@@ -1,5 +1,5 @@
 from tau_fibrils_yolo.predict import FibrilsDetector
-from tau_fibrils_yolo.crossover_distance import crossover_distance_measurement
+from tau_fibrils_yolo.measure import crossover_distance_measurement
 import tifffile
 from pathlib import Path
 import argparse

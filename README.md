@@ -32,7 +32,7 @@ pip install git+https://gitlab.com/center-for-imaging/tau-fibrils-object-detecti
 or clone the repository and install with:
 
 ```sh
-git clone git+https://gitlab.com/center-for-imaging/tau-fibrils-object-detection.git
+git clone https://github.com/EPFL-Center-for-Imaging/tau-fibrils-yolo.git
 cd tau-fibrils-yolo
 pip install -e .
 ```

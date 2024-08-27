@@ -16,6 +16,8 @@ from qtpy.QtWidgets import (
     QDoubleSpinBox,
     QFileDialog,
 )
+from matplotlib.backends.backend_qt5agg import FigureCanvas
+
 from tau_fibrils_yolo.predict import FibrilsDetector
 from tau_fibrils_yolo.postprocess import (
     boxes_kernel_density_map,
@@ -23,7 +25,21 @@ from tau_fibrils_yolo.postprocess import (
     outside_image_border_filter,
     overlapping_obb_filter,
 )
-from tau_fibrils_yolo.crossover_distance import crossover_distance_measurement
+from tau_fibrils_yolo.measure import (
+    box_measurements,
+    line_profile_measurements,
+    crossover_distance_measurement,
+)
+
+import matplotlib as mpl
+
+mpl.rc("axes", edgecolor="white")
+mpl.rc("axes", facecolor="#262930")
+mpl.rc("axes", labelcolor="white")
+mpl.rc("savefig", facecolor="#262930")
+mpl.rc("text", color="white")
+mpl.rc("xtick", color="white")
+mpl.rc("ytick", color="white")
 
 
 class YoloDetectorWidget(QWidget):
@@ -74,6 +90,19 @@ class YoloDetectorWidget(QWidget):
         export_btn.clicked.connect(self._save_csv)
         grid_layout.addWidget(export_btn, 6, 0, 1, 2)
 
+        # Line profile plot
+        self.canvas = FigureCanvas()
+        self.canvas.figure.set_tight_layout(True)
+        self.canvas.figure.patch.set_facecolor("#262930")
+        self.axes = self.canvas.figure.subplots()
+        self.axes.cla()
+        self.axes.set_ylabel("Intensity")
+        self.axes.set_xlabel("Pixels")
+        self.canvas.setSizePolicy(QSizePolicy.Minimum, QSizePolicy.Minimum)
+        self.canvas.setMaximumSize(500, 300)
+        self.canvas.setMinimumSize(300, 150)
+        grid_layout.addWidget(self.canvas, 7, 0, 1, 2)
+
         # Setup layer callbacks
         self.viewer.layers.events.inserted.connect(
             lambda e: e.value.events.name.connect(self._on_layer_change)
@@ -98,7 +127,9 @@ class YoloDetectorWidget(QWidget):
     def _prediction_thread(self, rescale_factor):
         all_boxes = []
         all_probas = []
-        for k, boxes, probas in self.predictor.yield_predictions(self.selected_image, rescale_factor):
+        for k, boxes, probas in self.predictor.yield_predictions(
+            self.selected_image, rescale_factor
+        ):
             all_boxes.extend(boxes)
             all_probas.extend(probas)
             yield k, boxes, probas
@@ -148,38 +179,36 @@ class YoloDetectorWidget(QWidget):
                 "opacity": 1.0,
                 "edge_width": 1,
                 "edge_color": "#ff0000",
-                "properties": {
-                    "probability": probas,
-                },
             }
 
             self.shapes_layer = self.viewer.add_shapes(boxes, **shape_kwargs)
+            self.shapes_layer.mouse_double_click_callbacks.append(
+                self._handle_double_click
+            )
+            self.shapes_layer.mode = "DIRECT"
         else:
             # Update the layer data
             current_data = self.shapes_layer.data
             current_data.extend(boxes)
-            current_probas = self.shapes_layer.properties.get("probability")
-            current_probas = list(current_probas)
-            current_probas.extend(probas)
             self.shapes_layer.data = current_data
-            self.shapes_layer.properties = ({"probability": current_probas},)
             self.shapes_layer.refresh()
 
     def _load_in_viewer(self, payload):
         """Callback from thread returning."""
         boxes, probas, rescale_factor = payload
 
-        filt = outside_image_border_filter(boxes)
-        boxes = boxes[filt]
-        probas = probas[filt]
+        if len(boxes):
+            filt = outside_image_border_filter(boxes)
+            boxes = boxes[filt]
+            probas = probas[filt]
 
-        filt = overlapping_obb_filter(boxes)
-        boxes = boxes[filt]
-        probas = probas[filt]
+            filt = overlapping_obb_filter(boxes)
+            boxes = boxes[filt]
+            probas = probas[filt]
 
-        filt = minimum_neighbor_distance_filter(boxes, rescale_factor)
-        boxes = boxes[filt]
-        probas = probas[filt]
+            filt = minimum_neighbor_distance_filter(boxes, rescale_factor)
+            boxes = boxes[filt]
+            probas = probas[filt]
 
         if len(boxes) == 0:
             show_info("No fibrils were detected.")
@@ -191,62 +220,43 @@ class YoloDetectorWidget(QWidget):
             density_map, colormap="inferno", opacity=0.5, blending="additive"
         )
         density_layer.visible = False
+        self.viewer.layers.selection.active = self.shapes_layer
 
         probas = list(probas)
 
         # Get the lines and crossover distances
-        image = self.cb_image.currentData()
-        distances = []
-        line_data = []
         centers_x = []
         centers_y = []
         lengths = []
         widths = []
         for box in boxes:
-            distance, line_points, center, length, width = (
-                crossover_distance_measurement(box, image)
-            )
-            distances.append(distance)
-            line_data.append(line_points)
+            center, length, width = box_measurements(box)
             centers_x.append(center[0])
             centers_y.append(center[1])
             lengths.append(length)
             widths.append(width)
 
+        self.shapes_layer.data = boxes
+        self.shapes_layer.properties = {
+            "probability": probas,
+            "length": lengths,
+            "width": widths,
+            "center_x": centers_x,
+            "center_y": centers_y,
+        }
+
+        self.shapes_layer.edge_color = "#00ff00"
+        self.shapes_layer.refresh()
+
         self.df = pd.DataFrame(
             {
-                "detection_probability": probas,
-                "crossover_distance": distances,
+                "probability": probas,
                 "length": lengths,
                 "width": widths,
                 "center_x": centers_x,
                 "center_y": centers_y,
             }
         )
-
-        lines_props = {
-            "shape_type": "line",
-            "name": "Crossover distance",
-            "opacity": 1.0,
-            "edge_width": 1,
-            "edge_color": "probability",
-            "properties": {"probability": probas, "distance": distances},
-        }
-        self.crossover_shapes_layer = self.viewer.add_shapes(line_data, **lines_props)
-
-        self.shapes_layer.data = boxes
-        self.shapes_layer.properties = (
-            {
-                "probability": probas,
-                "distance": distances,
-                "length": lengths,
-                "width": widths,
-                "center_x": centers_x,
-                "center_y": centers_y,
-            },
-        )
-        self.shapes_layer.edge_color = "#00ff00"
-        self.shapes_layer.refresh()
 
     def _save_csv(self):
         if self.df is None:
@@ -260,3 +270,26 @@ class YoloDetectorWidget(QWidget):
 
         self.df.to_csv(filename)
         print(f"Saved {filename}!")
+
+    def _handle_double_click(self, *args, **kwargs):
+        if self.shapes_layer.mode in ["direct", "select"]:
+            selected_data = self.shapes_layer.selected_data
+            if len(selected_data) == 1:
+                selected_shape_idx = list(self.shapes_layer.selected_data)[0]
+                boxes = self.shapes_layer.data
+                image = self.cb_image.currentData()
+                box = boxes[selected_shape_idx]
+                line_profile_width, line_profile_centerline = line_profile_measurements(box, image)
+                crossover_distance = crossover_distance_measurement(box, image)
+                crossover_distance_centerline = crossover_distance_measurement(box, image, method="centerline")
+                self._draw(line_profile_width, line_profile_centerline, crossover_distance, crossover_distance_centerline)
+
+    def _draw(self, line_profile_width, line_profile_centerline, crossover_distance, crossover_distance_centerline):
+        self.axes.cla()
+        self.axes.plot(line_profile_width, label=f"box_width (crossover_dist: {crossover_distance:.0f} px)")
+        self.axes.plot(line_profile_centerline, color="orange", label=f"centerline (crossover_dist: {crossover_distance_centerline:.0f} px)")
+        self.axes.set_ylabel("Intensity")
+        self.axes.set_xlabel("Pixels")
+        self.axes.set_xlim(0, len(line_profile_width))
+        self.axes.legend(bbox_to_anchor=(0, 1.02, 1, 0.2), loc="lower left", mode="expand", borderaxespad=0, ncol=1)
+        self.canvas.draw()
