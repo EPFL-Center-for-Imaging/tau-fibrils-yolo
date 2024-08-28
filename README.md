@@ -5,7 +5,7 @@
 
 We provide a [YoloV8](https://docs.ultralytics.com/) model for the detection of oriented bounding boxes (OBBs) of Tau fibrils in Cryo-EM images.
 
-[[`Installation`](#installation)] [[`Model`](#model)] [[`Usage`](#usage)]
+[[`Installation`](#installation)] [[`Model`](#model)] [[`Usage`](#usage)] [[`Training`](#training)]
 
 This project is part of a collaboration between the [EPFL Center for Imaging](https://imaging.epfl.ch/) and the [Laboratory of Biological Electron Microscopy](https://www.lbem.ch/).
 
@@ -103,6 +103,10 @@ folder/
     ├── image_002.tif
     ├── image_002_results.csv
 ```
+
+## Training
+
+The instructions for training the model can be found [here](./scripts/instructions.md).
 
 ## Issues
 
