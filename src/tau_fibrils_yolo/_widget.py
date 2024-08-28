@@ -263,7 +263,6 @@ class YoloDetectorWidget(QWidget):
             print("No detection data found.")
             return
 
-        print("Saving CSV.")
         filename, _ = QFileDialog.getSaveFileName(self, "Save as CSV", ".", "*.csv")
         if not filename.endswith(".csv"):
             filename += ".csv"

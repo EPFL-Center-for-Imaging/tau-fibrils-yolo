@@ -167,3 +167,5 @@ trained_models/*.pt
 notebooks/
 
 _version.py
+
+output/
