@@ -1,9 +1,9 @@
 ![EPFL Center for Imaging logo](https://imaging.epfl.ch/resources/logo-for-gitlab.svg)
-# 🧬 Tau Fibrils Yolo - Object detection in Cryo-EM images
+# 🧬 Tau Fibrils Yolo - Object detection in EM images
 
 ![screenshot](assets/screenshot.png)
 
-We provide a [YoloV8](https://docs.ultralytics.com/) model for the detection of oriented bounding boxes (OBBs) of Tau fibrils in Cryo-EM images.
+We provide a [YoloV8](https://docs.ultralytics.com/) model for the detection of oriented bounding boxes (OBBs) of Tau fibrils in EM images.
 
 [[`Installation`](#installation)] [[`Model`](#model)] [[`Usage`](#usage)] [[`Training`](#training)]
 

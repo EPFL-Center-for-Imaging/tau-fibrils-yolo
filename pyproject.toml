@@ -1,7 +1,7 @@
 [project]
 name = "tau-fibrils-yolo"
 dynamic = ["version"]
-description = "YoloV8 model for the detection of Tau fibrils in Cryo-EM images."
+description = "YoloV8 model for the detection of Tau fibrils in EM images."
 readme = "README.md"
 requires-python = ">=3.9"
 license = {file = "LICENSE"}
