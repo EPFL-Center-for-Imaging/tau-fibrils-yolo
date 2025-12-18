@@ -3,7 +3,7 @@
 
 ![screenshot](assets/screenshot.png)
 
-We provide a [YoloV8](https://docs.ultralytics.com/) model for the detection of oriented bounding boxes (OBBs) of Tau fibrils in EM images.
+We provide a [YoloV8](https://docs.ultralytics.com/) model for the detection of oriented bounding boxes (OBBs) of Tau fibrils in EM images. The model is integrated as a [Napari](https://napari.org/stable/) plugin.
 
 [[`Installation`](#installation)] [[`Model`](#model)] [[`Usage`](#usage)] [[`Training`](#training)]
 
@@ -11,13 +11,7 @@ This project is part of a collaboration between the [EPFL Center for Imaging](ht
 
 ## Installation
 
-### As a standalone app
-
-Download and run the latest installer from the [Releases](https://github.com/EPFL-Center-for-Imaging/tau-fibrils-yolo/releases) page.
-
-### As a Python package
-
-We recommend performing the installation in a clean Python environment. Install our package from PyPi:
+We recommend performing the installation in a clean Python environment. Install the package from PyPi:
 
 ```sh
 pip install tau-fibrils-yolo
@@ -37,71 +31,32 @@ cd tau-fibrils-yolo
 pip install -e .
 ```
 
-## Model
-
-The model weights (6.5 Mb) are automatically downloaded from [this repository on Zenodo](https://sandbox.zenodo.org/records/99113) the first time you run inference. The model files are saved in the user home folder in the `.yolo` directory.
-
 ## Usage
 
 **In Napari**
 
-To use our model in Napari, start the viewer with
+To use the model in Napari, start the viewer with
 
 ```sh
 napari -w tau-fibrils-yolo
 ```
 
-or open the Napari menu bar and select `Plugins > Tau fibrils detection`.
+or open the plugin from `Plugins > Tau fibrils detection`.
 
-Open an image using `File > Open files` or drag-and-drop an image into the viewer window.
+**From the command-line**
 
-**Sample data**: To test the model, you can run it on our provided sample image. In Napari, open the image from `File > Open Sample > [TODO - add a sample image]`.
-
-
-**As a library**
-
-You can run the model to detect fibrils in an image (represented as a numpy array).
-
-```py
-from tau_fibrils_yolo import FibrilsDetector
-
-detector = FibrilsDetector()
-
-boxes, probabilities = detector.predict(your_image)
-```
-
-**As a CLI**
-
-Run inference on an image from the command-line. For example:
+Run inference on an image from the command-line:
 
 ```sh
 tau_fibrils_predict_image -i /path/to/folder/image_001.tif
 ```
 
-The command will save the segmentation next to the image:
+This command will run the YOLO model and save a CSV file containing measurements next to the image:
 
 ```
 folder/
     ├── image_001.tif
     ├── image_001_results.csv
-```
-
-Optionally, you can use the `-r` flag to also rescale the image by a given factor.
-
-To run inference in batch on all images in a folder, use:
-
-```sh
-tau_fibrils_predict_folder -i /path/to/folder/
-```
-
-This will produce:
-
-```
-folder/
-    ├── image_001.tif
-    ├── image_001_results.csv
-    ├── image_002.tif
-    ├── image_002_results.csv
 ```
 
 ## Training
