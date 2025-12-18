@@ -1,4 +1,5 @@
 import os
+from importlib import resources
 from pathlib import Path
 
 import imaging_server_kit as sk
@@ -7,12 +8,10 @@ import pooch
 from skimage.color import gray2rgb
 from ultralytics import YOLO
 
-from tau_fibrils_yolo.boxes_utils import (
-    boxes_iou_filter,
-    boxes_kernel_density_map,
-    boxes_min_distance_filter,
-    clear_border_boxes,
-)
+from tau_fibrils_yolo.boxes_utils import (boxes_iou_filter,
+                                          boxes_kernel_density_map,
+                                          boxes_min_distance_filter,
+                                          clear_border_boxes)
 
 _MODEL = None
 
@@ -113,6 +112,11 @@ def _detect_fibrils_tile(image: np.ndarray, imgsz: int, iou: float, conf: float)
             default=True,
         ),
     },
+    samples=[
+        {
+            "image": resources.files("tau_fibrils_yolo").joinpath("sample/sample.tif")
+        }
+    ]
 )
 def detect_fibrils(image, iou, conf, color_by_probas):
     model = get_model()
