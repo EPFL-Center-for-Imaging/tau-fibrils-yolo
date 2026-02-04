@@ -27,7 +27,8 @@ venv/
 
 push.sh
 todo.txt
-*.pt
+trained_models/
+pretrained_models/
 qupath/
 output/
 notebooks/

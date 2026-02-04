@@ -10,13 +10,13 @@ import imaging_server_kit as sk
 
 
 class YoloDetectorWidget(QWidget):
-    def __init__(self, viewer):
+    def __init__(self, napari_viewer):
         super().__init__()
         multi = sk.combine(
             [detect_fibrils, max_iou_boxes, min_distance_boxes, boxes_kernel_density],
             name="Tau fibrils analysis",
         )
-        widget = sk.to_qwidget(multi, viewer)
+        widget = sk.to_qwidget(multi, napari_viewer)
         self.setLayout(widget.layout())
 
 

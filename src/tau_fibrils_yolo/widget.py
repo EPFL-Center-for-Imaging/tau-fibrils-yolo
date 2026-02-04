@@ -4,7 +4,6 @@ from pathlib import Path
 
 import imaging_server_kit as sk
 import numpy as np
-import pooch
 from skimage.color import gray2rgb
 from ultralytics import YOLO
 
@@ -18,25 +17,10 @@ _MODEL = None
 MODEL_DIR = Path(os.getenv("XDG_DATA_HOME", Path.home())) / ".yolo"
 WEIGHTS_PATH = MODEL_DIR / "yolo_fibrils_100ep.pt"
 
-
-def retrieve_model():
-    MODEL_DIR.mkdir(parents=True, exist_ok=True)
-    if WEIGHTS_PATH.exists():
-        return str(WEIGHTS_PATH)
-
-    return pooch.retrieve(
-        url="https://sandbox.zenodo.org/records/99113/files/100ep.pt",
-        known_hash="md5:2fc4be1e4feae93f75e335856be3083d",
-        path=str(MODEL_DIR),
-        fname=WEIGHTS_PATH.name,
-        progressbar=True,
-    )
-
-
 def get_model() -> YOLO:
     global _MODEL
     if _MODEL is None:
-        weights = retrieve_model()
+        weights = resources.files("tau_fibrils_yolo").joinpath("model/100ep.pt")
         _MODEL = YOLO(weights)
     return _MODEL
 
@@ -50,9 +34,7 @@ def cast_to_rgb(image: np.ndarray) -> np.ndarray:
     return image
 
 
-@sk.algorithm(
-    # parameters={"image": sk.Image(rgb=True)}
-)
+@sk.algorithm
 def _detect_fibrils_tile(image: np.ndarray, imgsz: int, iou: float, conf: float):
     """Runs the model on a tile corresponding to the model's imgsz that it was trained on."""
 
