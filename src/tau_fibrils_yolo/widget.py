@@ -51,6 +51,7 @@ def _detect_fibrils_tile(image: np.ndarray, imgsz: int, iou: float, conf: float)
         iou=iou,  # Intersection over union threshold.
         augment=False,
         imgsz=imgsz,  # Square resizing to this image size
+        verbose=False,
     )[0]
 
     probas = result.obb.conf.cpu().numpy()
