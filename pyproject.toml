@@ -31,8 +31,8 @@ dependencies = [
     "scikit-learn",
     "ultralytics",
     "opencv-contrib-python-headless",
-    "imaging-server-kit>=0.1.3",
-    "napari-serverkit>=0.0.9",
+    "imaging-server-kit>=0.2",
+    "napari-serverkit>=0.2",
 ]
 
 [project.entry-points."napari.manifest"]

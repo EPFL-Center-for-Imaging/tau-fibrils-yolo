@@ -34,7 +34,7 @@ def cast_to_rgb(image: np.ndarray) -> np.ndarray:
     return image
 
 
-@sk.algorithm
+@sk.algorithm(tileable=True)
 def _detect_fibrils_tile(image: np.ndarray, imgsz: int, iou: float, conf: float):
     """Runs the model on a tile corresponding to the model's imgsz that it was trained on."""
 
@@ -99,14 +99,15 @@ def _detect_fibrils_tile(image: np.ndarray, imgsz: int, iou: float, conf: float)
         {
             "image": resources.files("tau_fibrils_yolo").joinpath("sample/sample.tif")
         }
-    ]
+    ],
+    tileable=True,
 )
 def detect_fibrils(image, iou, conf, color_by_probas):
     model = get_model()
     imgsz = model.args.get("imgsz", 640)
 
     results = _detect_fibrils_tile.run(
-        image, imgsz, iou, conf, tiled=True, tile_size_px=imgsz, overlap_percent=0.1
+        image, imgsz, iou, conf, tiled=True, tile_size=imgsz, tile_overlap=0.1
     )
 
     boxes_result = results.read("Boxes")
@@ -144,7 +145,6 @@ def detect_fibrils(image, iou, conf, color_by_probas):
             name="Min distance", description="Minimum distance in pixels", default=5
         ),
     },
-    tileable=False,
 )
 def min_distance_boxes(boxes, min_dist_px):
     boxes = boxes_min_distance_filter(boxes, min_dist_px=min_dist_px)
@@ -177,7 +177,6 @@ def min_distance_boxes(boxes, min_dist_px):
             default=0.5,
         ),
     },
-    tileable=False,
 )
 def max_iou_boxes(boxes, max_iou):
     boxes = boxes_iou_filter(boxes, max_iou)
@@ -217,7 +216,6 @@ def max_iou_boxes(boxes, max_iou):
             step=2,
         ),
     },
-    tileable=False,
 )
 def boxes_kernel_density(boxes, image, gaussian_sigma_px, downscale_factor):
     density_map = boxes_kernel_density_map(
