@@ -1,4 +1,3 @@
-![EPFL Center for Imaging logo](https://imaging.epfl.ch/resources/logo-for-gitlab.svg)
 # 🧬 Tau Fibrils Yolo - Object detection in EM images
 
 ![screenshot](assets/screenshot.png)
