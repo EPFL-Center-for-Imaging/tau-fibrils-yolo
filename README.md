@@ -4,7 +4,7 @@
 
 We provide a [YoloV8](https://docs.ultralytics.com/) model for the detection of oriented bounding boxes (OBBs) of Tau fibrils in EM images. The model is integrated as a [Napari](https://napari.org/stable/) plugin.
 
-[[`Installation`](#installation)] [[`Model`](#model)] [[`Usage`](#usage)] [[`Training`](#training)]
+[[`Installation`](#installation)] [[`Usage`](#usage)] [[`Training`](#training)]
 
 This project is part of a collaboration between the [EPFL Center for Imaging](https://imaging.epfl.ch/) and the [Laboratory of Biological Electron Microscopy](https://www.lbem.ch/).
 
