@@ -19,7 +19,7 @@ pip install tau-fibrils-yolo
 or from the repository:
 
 ```sh
-pip install git+https://gitlab.com/center-for-imaging/tau-fibrils-object-detection.git
+pip install git+https://github.com/EPFL-Center-for-Imaging/tau-fibrils-yolo.git
 ```
 
 or clone the repository and install with:
